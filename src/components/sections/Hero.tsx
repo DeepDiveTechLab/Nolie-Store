@@ -1,14 +1,11 @@
 import React from 'react';
+import HeroFlowerCanvas from './HeroFlowerCanvas';
 const Hero: React.FC = () => {
   return (
-    <section className="relative h-screen flex items-center overflow-hidden">
+    <section className="relative h-screen flex items-center overflow-hidden bg-noliee-cream-100">
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-r from-noliee-cream-50/90 to-transparent z-10"></div>
-        <img
-          src="/images/hero-flower.jpg"
-          alt="Arreglo floral elegante de Noliē"
-          className="w-full h-full object-cover"
-        />
+        <HeroFlowerCanvas />
       </div>
 
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
