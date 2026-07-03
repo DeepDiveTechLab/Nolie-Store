@@ -26,12 +26,16 @@ function drawCover(
   ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 }
 
-const HeroFlowerCanvas: React.FC = () => {
+interface HeroFlowerCanvasProps {
+  /** Ref to the outer scroll-height wrapper that defines the scrub range */
+  scrollRangeRef: React.RefObject<HTMLDivElement>;
+  className?: string;
+}
+
+const HeroFlowerCanvas: React.FC<HeroFlowerCanvasProps> = ({ scrollRangeRef, className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
-  const lastFrameTimeRef = useRef<number>(0);
-  const currentIndexRef = useRef<number>(0);
-  const readyRef = useRef<boolean>(false);
+  const currentIndexRef = useRef<number>(-1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -45,7 +49,7 @@ const HeroFlowerCanvas: React.FC = () => {
 
     let cancelled = false;
     const images: HTMLImageElement[] = new Array(HERO_FRAME_COUNT);
-    let loadedCount = 0;
+    let loadedFirst = false;
 
     function resizeCanvas() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -55,25 +59,38 @@ const HeroFlowerCanvas: React.FC = () => {
       if (canvas!.width !== w || canvas!.height !== h) {
         canvas!.width = w;
         canvas!.height = h;
+        currentIndexRef.current = -1;
       }
     }
 
-    function drawCurrentFrame() {
-      const img = images[currentIndexRef.current];
+    function drawFrame(index: number) {
+      const img = images[index];
       if (img && img.complete && img.naturalWidth > 0) {
         drawCover(ctx!, img, canvas!.width, canvas!.height);
       }
     }
 
-    function tick(time: number) {
+    function getScrollProgress(): number {
+      const wrapper = scrollRangeRef.current;
+      if (!wrapper) return 0;
+      const rect = wrapper.getBoundingClientRect();
+      const scrollableDistance = rect.height - window.innerHeight;
+      if (scrollableDistance <= 0) return 0;
+      const scrolled = -rect.top;
+      return Math.max(0, Math.min(1, scrolled / scrollableDistance));
+    }
+
+    function tick() {
       if (cancelled) return;
-      if (readyRef.current && !prefersReducedMotion) {
-        const frameDuration = 1000 / 15;
-        if (time - lastFrameTimeRef.current >= frameDuration) {
-          lastFrameTimeRef.current = time;
-          currentIndexRef.current =
-            (currentIndexRef.current + 1) % HERO_FRAME_COUNT;
-          drawCurrentFrame();
+      if (loadedFirst) {
+        const progress = prefersReducedMotion ? 0 : getScrollProgress();
+        const index = Math.min(
+          HERO_FRAME_COUNT - 1,
+          Math.floor(progress * HERO_FRAME_COUNT)
+        );
+        if (index !== currentIndexRef.current) {
+          currentIndexRef.current = index;
+          drawFrame(index);
         }
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -86,12 +103,9 @@ const HeroFlowerCanvas: React.FC = () => {
       const img = new Image();
       img.decoding = 'async';
       img.onload = () => {
-        loadedCount++;
         if (i === 0) {
-          drawCurrentFrame();
-        }
-        if (loadedCount === HERO_FRAME_COUNT) {
-          readyRef.current = true;
+          loadedFirst = true;
+          drawFrame(0);
         }
       };
       img.src = heroFrameUrl(i + 1);
@@ -105,12 +119,12 @@ const HeroFlowerCanvas: React.FC = () => {
       window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [scrollRangeRef]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full"
+      className={`absolute inset-0 w-full h-full ${className}`}
       aria-hidden="true"
     />
   );
